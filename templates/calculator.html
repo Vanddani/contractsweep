@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Bid-floor calculator — {{ brand_name }}{% endblock %}
+{% block content %}
+<section class="section calculator-section">
+  <div class="container narrow center"><p class="eyebrow">Free operator tool</p><h1>Commercial cleaning bid-floor calculator</h1><p class="section-lead">Use your own production rate and cost assumptions. The output is a pricing floor, not a quote or industry benchmark.</p></div>
+  <div class="container calculator-grid">
+    <form id="bid-calculator" class="calculator-form card">
+      <div class="field-grid">
+        <label>Cleanable square feet<input type="number" name="sqft" min="1" step="1" value="25000" required></label>
+        <label>Visits per week<input type="number" name="visits" min="0.25" step="0.25" value="5" required></label>
+        <label>Your production rate (sq ft/hour)<input type="number" name="rate" min="1" step="1" value="3500" required></label>
+        <label>Base wage ($/hour)<input type="number" name="wage" min="0" step="0.01" value="18" required></label>
+        <label>Labor burden (%)<input type="number" name="burden" min="0" max="200" step="0.1" value="28" required></label>
+        <label>Supplies per visit ($)<input type="number" name="supplies" min="0" step="0.01" value="65" required></label>
+        <label>Monthly equipment/other cost ($)<input type="number" name="equipment" min="0" step="0.01" value="350" required></label>
+        <label>Overhead on direct cost (%)<input type="number" name="overhead" min="0" max="200" step="0.1" value="15" required></label>
+        <label>Target operating margin (%)<input type="number" name="margin" min="0" max="90" step="0.1" value="15" required></label>
+      </div>
+      <button class="button button-dark" type="submit">Calculate pricing floor</button>
+    </form>
+    <div class="calculator-results card" aria-live="polite">
+      <p class="eyebrow">Estimated monthly economics</p>
+      <div class="result-primary"><span>Minimum monthly price</span><strong id="result-price">—</strong></div>
+      <dl>
+        <div><dt>Monthly labor hours</dt><dd id="result-hours">—</dd></div>
+        <div><dt>Loaded labor cost</dt><dd id="result-labor">—</dd></div>
+        <div><dt>Supplies</dt><dd id="result-supplies">—</dd></div>
+        <div><dt>Equipment/other</dt><dd id="result-equipment">—</dd></div>
+        <div><dt>Overhead</dt><dd id="result-overhead">—</dd></div>
+        <div><dt>Target operating profit</dt><dd id="result-profit">—</dd></div>
+      </dl>
+      <p class="fine-print">This model excludes taxes, special project work, mobilization, supervision not captured by the production rate, unusual consumables, compliance costs, and contract-specific risk. Review all wage, labor, insurance, and solicitation requirements independently.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

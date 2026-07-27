@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ opportunity['title'] }} — {{ brand_name }}{% endblock %}
+{% block content %}
+<section class="section detail-section">
+  <div class="container">
+    <a class="back-link" href="{{ url_for('dashboard') }}">← Back to opportunity queue</a>
+    <div class="detail-grid">
+      <div>
+        <div class="detail-heading">
+          <div class="score {% if opportunity['relevance_score'] >= 75 %}score-high{% elif opportunity['relevance_score'] >= 50 %}score-mid{% else %}score-low{% endif %}">{{ opportunity['relevance_score'] }}</div>
+          <div><p class="eyebrow">{{ opportunity['agency'] }}</p><h1>{{ opportunity['title'] }}</h1><p>{{ opportunity['solicitation_number'] or 'Solicitation number not stated' }}</p></div>
+        </div>
+        {% if opportunity['source'] == 'DEMO' %}<div class="notice-banner"><strong>Synthetic demo record.</strong> This entry is for interface testing and is not a real solicitation.</div>{% endif %}
+
+        <section class="detail-card card">
+          <h2>Review summary</h2>
+          <div class="detail-facts">
+            <div><span>Location</span><strong>{{ opportunity['city'] }}{% if opportunity['city'] and opportunity['state'] %}, {% endif %}{{ opportunity['state'] or 'Not stated' }}</strong></div>
+            <div><span>Response deadline</span><strong>{{ opportunity['response_deadline']|date_display }} · {{ opportunity['response_deadline']|days_left }}</strong></div>
+            <div><span>Posted</span><strong>{{ opportunity['posted_date']|date_display }}</strong></div>
+            <div><span>Notice type</span><strong>{{ opportunity['notice_type'] or 'Not stated' }}</strong></div>
+            <div><span>NAICS</span><strong>{{ opportunity['naics_code'] or 'Not stated' }}</strong></div>
+            <div><span>Set-aside</span><strong>{{ opportunity['set_aside_description'] or 'None stated' }}</strong></div>
+          </div>
+        </section>
+
+        <section class="detail-card card">
+          <h2>Why the score moved</h2>
+          <ul class="reason-list">{% for reason in score_reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+          <p class="fine-print">The score only ranks likely category relevance and timing. It does not inspect every attachment, verify eligibility, or estimate the likelihood of winning.</p>
+        </section>
+
+        <section class="detail-card card">
+          <h2>Official-source review</h2>
+          <p>Read the complete notice, amendments, performance work statement, wage determinations, site-visit requirements, and submission instructions before making a bid decision.</p>
+          <div class="button-row">
+            {% if opportunity['source_url'] %}<a class="button button-dark" target="_blank" rel="noopener noreferrer" href="{{ opportunity['source_url'] }}">Open official notice</a>{% endif %}
+            {% for link in resources[:3] %}<a class="button button-secondary" target="_blank" rel="noopener noreferrer" href="{{ link }}">Attachment {{ loop.index }}</a>{% endfor %}
+          </div>
+        </section>
+
+        {% if contacts %}
+        <section class="detail-card card">
+          <h2>Notice contacts</h2>
+          <div class="contact-grid">
+            {% for contact in contacts %}
+            <div><strong>{{ contact.get('fullName') or contact.get('fullname') or 'Contract contact' }}</strong><span>{{ contact.get('title') or contact.get('type') or '' }}</span>{% if contact.get('email') %}<a href="mailto:{{ contact.get('email') }}">{{ contact.get('email') }}</a>{% endif %}{% if contact.get('phone') %}<span>{{ contact.get('phone') }}</span>{% endif %}</div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+      </div>
+
+      <aside class="pipeline-card card">
+        <p class="eyebrow">Your bid pipeline</p>
+        <h2>Decision record</h2>
+        {% if current_subscriber['is_demo'] %}<div class="notice-banner"><strong>Read-only demo.</strong> Paid subscriber accounts can save stages and notes.</div>{% endif %}
+        <form class="stacked-form" method="post" action="{{ url_for('update_pipeline', opportunity_id=opportunity['id']) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label>Stage<select name="stage" {% if current_subscriber['is_demo'] %}disabled{% endif %}>{% for stage in pipeline_stages %}<option value="{{ stage }}" {% if opportunity['pipeline_stage'] == stage %}selected{% endif %}>{{ stage|title }}</option>{% endfor %}</select></label>
+          <label>Notes<textarea name="notes" rows="8" {% if current_subscriber['is_demo'] %}disabled{% endif %} placeholder="Eligibility checks, site visit, staffing, open questions…">{{ opportunity['pipeline_notes'] or '' }}</textarea></label>
+          <button class="button button-primary button-block" type="submit" {% if current_subscriber['is_demo'] %}disabled aria-disabled="true"{% endif %}>{% if current_subscriber['is_demo'] %}Read-only demo{% else %}Save decision{% endif %}</button>
+        </form>
+        <hr>
+        <h3>Minimum review checklist</h3>
+        <ul class="small-checklist"><li>Service area and travel</li><li>Set-aside eligibility</li><li>Site visit and deadline</li><li>Square footage and frequencies</li><li>Labor category and wage rules</li><li>Equipment and supply obligations</li><li>Insurance, bonding, and past performance</li></ul>
+      </aside>
+    </div>
+  </div>
+</section>
+{% endblock %}

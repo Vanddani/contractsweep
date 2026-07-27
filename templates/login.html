@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Subscriber sign in — {{ brand_name }}{% endblock %}
+{% block content %}
+<section class="section auth-section">
+  <div class="container auth-card card">
+    <p class="eyebrow">Passwordless access</p>
+    <h1>Subscriber sign in</h1>
+    <p>Enter the email attached to an active subscription. The link expires after 30 minutes.</p>
+    <form class="stacked-form" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Email<input type="email" name="email" required autocomplete="email"></label>
+      <button class="button button-primary" type="submit">Send sign-in link</button>
+    </form>
+    {% if magic_link %}
+      <div class="dev-link"><strong>Local test link</strong><a href="{{ magic_link }}">Sign in to the MVP</a></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

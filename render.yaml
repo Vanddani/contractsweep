@@ -1,0 +1,92 @@
+services:
+  - type: web
+    name: contractsweep
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: TASK_TOKEN
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /var/data/contractsweep.db
+      - key: ENABLE_PUBLIC_DEMO
+        value: "true"
+      - key: DEMO_MODE
+        value: "false"
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: BASE_URL
+        sync: false
+      - key: SAM_API_KEY
+        sync: false
+      - key: SAM_LOOKBACK_DAYS
+        value: "120"
+      - key: SAM_NAICS_CODES
+        value: "561720,561210,561790,561740"
+      - key: DELETE_DEMO_ON_SYNC
+        value: "true"
+      - key: STRIPE_PAYMENT_LINK
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PAYMENT_LINK_ID
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: SUPPORT_EMAIL
+        sync: false
+      - key: FOUNDING_PRICE
+        value: "79"
+      - key: DEFAULT_MIN_SCORE
+        value: "50"
+      - key: DIGEST_MAX_ITEMS
+        value: "12"
+    disk:
+      name: contractsweep-data
+      mountPath: /var/data
+      sizeGB: 1
+
+  # Render cron services cannot mount the web service's persistent disk.
+  # These jobs therefore call token-protected HTTP task endpoints on the web
+  # service, where all SQLite reads and writes occur on the mounted disk.
+  - type: cron
+    name: contractsweep-sam-sync
+    runtime: docker
+    schedule: "15 6 * * *"
+    dockerCommand: >-
+      python -c "import os,urllib.request;u=os.environ['BASE_URL'].rstrip('/')+'/tasks/sync';r=urllib.request.Request(u,method='POST',headers={'X-Task-Token':os.environ['TASK_TOKEN']});print(urllib.request.urlopen(r,timeout=240).read().decode())"
+    envVars:
+      - key: BASE_URL
+        fromService:
+          type: web
+          name: contractsweep
+          envVarKey: BASE_URL
+      - key: TASK_TOKEN
+        fromService:
+          type: web
+          name: contractsweep
+          envVarKey: TASK_TOKEN
+
+  - type: cron
+    name: contractsweep-digest
+    runtime: docker
+    schedule: "0 13 * * 1-5"
+    dockerCommand: >-
+      python -c "import os,urllib.request;u=os.environ['BASE_URL'].rstrip('/')+'/tasks/digests';r=urllib.request.Request(u,method='POST',headers={'X-Task-Token':os.environ['TASK_TOKEN']});print(urllib.request.urlopen(r,timeout=240).read().decode())"
+    envVars:
+      - key: BASE_URL
+        fromService:
+          type: web
+          name: contractsweep
+          envVarKey: BASE_URL
+      - key: TASK_TOKEN
+        fromService:
+          type: web
+          name: contractsweep
+          envVarKey: TASK_TOKEN

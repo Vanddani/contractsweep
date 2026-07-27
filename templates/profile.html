@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Alert profile — {{ brand_name }}{% endblock %}
+{% block content %}
+<section class="section auth-section">
+  <div class="container auth-card card wide-card">
+    <p class="eyebrow">Digest configuration</p><h1>Alert profile</h1><p>These settings narrow weekday email digests. Leave states or set-asides blank to include all values.</p>
+    {% if subscriber['is_demo'] %}<div class="notice-banner"><strong>Read-only demo.</strong> Subscriber accounts can save a company-specific alert profile.</div>{% endif %}
+    <form class="stacked-form" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Company<input type="text" name="company" {% if subscriber['is_demo'] %}disabled{% endif %} value="{{ subscriber['company'] or '' }}"></label>
+      <label>Service states, comma-separated<input type="text" name="states" {% if subscriber['is_demo'] %}disabled{% endif %} value="{{ subscriber['states'] or '' }}" placeholder="IL, WI, IN"></label>
+      <label>Eligible set-aside codes, comma-separated<input type="text" name="set_asides" {% if subscriber['is_demo'] %}disabled{% endif %} value="{{ subscriber['set_asides'] or '' }}" placeholder="SBA, 8A, WOSB, SDVOSBC"></label>
+      <label>Minimum relevance score<input type="number" name="min_score" {% if subscriber['is_demo'] %}disabled{% endif %} min="0" max="100" value="{{ subscriber['min_score'] }}"></label>
+      <button class="button button-primary" type="submit" {% if subscriber['is_demo'] %}disabled aria-disabled="true"{% endif %}>{% if subscriber['is_demo'] %}Read-only demo{% else %}Save alert profile{% endif %}</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
