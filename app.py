@@ -1062,7 +1062,7 @@ def stripe_webhook() -> Response:
         abort(503, description="Stripe webhook is not configured")
     signature = request.headers.get("Stripe-Signature", "")
     try:
-        event = Webhook.construct_event(request.get_data(), signature, secret)
+        event = Webhook.construct_event(request.get_data(), signature, secret).to_dict()
     except (ValueError, SignatureVerificationError):
         abort(400, description="Invalid Stripe webhook")
 
