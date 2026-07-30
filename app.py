@@ -181,6 +181,27 @@ CREATE TABLE IF NOT EXISTS task_locks (
     name TEXT PRIMARY KEY,
     acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_subscribers_stripe_subscription
+    ON subscribers(stripe_subscription_id);
+
+CREATE TABLE IF NOT EXISTS stripe_events (
+    event_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    event_created INTEGER NOT NULL DEFAULT 0,
+    processed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_stripe_events_created
+    ON stripe_events(event_created);
+
+CREATE TABLE IF NOT EXISTS stripe_subscription_states (
+    subscription_id TEXT PRIMARY KEY,
+    customer_id TEXT,
+    local_status TEXT NOT NULL,
+    last_event_created INTEGER NOT NULL DEFAULT 0,
+    last_event_id TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -1066,52 +1087,162 @@ def stripe_webhook() -> Response:
     except (ValueError, SignatureVerificationError):
         abort(400, description="Invalid Stripe webhook")
 
-    event_type = event.get("type")
+    event_id = str(event.get("id") or "").strip()
+    event_type = str(event.get("type") or "").strip()
+    try:
+        event_created = max(0, int(event.get("created") or 0))
+    except (TypeError, ValueError):
+        event_created = 0
+    if not event_id or not event_type:
+        abort(400, description="Stripe event is missing an id or type")
+
     obj = event.get("data", {}).get("object", {})
+    if not isinstance(obj, dict):
+        obj = {}
     db = get_db()
+
+    # Stripe can retry the same event. Persist the event id in the same
+    # transaction as the business-state change so duplicate deliveries are
+    # acknowledged without repeating activation emails or database writes.
+    try:
+        db.execute(
+            "INSERT INTO stripe_events(event_id, event_type, event_created) VALUES(?, ?, ?)",
+            (event_id, event_type, event_created),
+        )
+    except sqlite3.IntegrityError:
+        db.rollback()
+        return jsonify({"received": True, "duplicate": True})
+
+    def apply_subscription_state(
+        subscription_id: str,
+        customer_id: str,
+        local_status: str,
+    ) -> bool:
+        """Apply only a state event that is not older than what we have seen.
+
+        Stripe retries can deliver an old checkout event after a newer
+        cancellation. A cancellation wins when two events have the same
+        second-level timestamp, preventing stale activation.
+        """
+        existing = db.execute(
+            """
+            SELECT local_status, last_event_created
+            FROM stripe_subscription_states
+            WHERE subscription_id=?
+            """,
+            (subscription_id,),
+        ).fetchone()
+        if existing is not None:
+            last_created = int(existing["last_event_created"] or 0)
+            if event_created < last_created:
+                return False
+            if (
+                event_created == last_created
+                and existing["local_status"] == "inactive"
+                and local_status == "active"
+            ):
+                return False
+        db.execute(
+            """
+            INSERT INTO stripe_subscription_states(
+                subscription_id, customer_id, local_status,
+                last_event_created, last_event_id
+            )
+            VALUES(?, ?, ?, ?, ?)
+            ON CONFLICT(subscription_id) DO UPDATE SET
+                customer_id=excluded.customer_id,
+                local_status=excluded.local_status,
+                last_event_created=excluded.last_event_created,
+                last_event_id=excluded.last_event_id,
+                updated_at=CURRENT_TIMESTAMP
+            """,
+            (subscription_id, customer_id, local_status, event_created, event_id),
+        )
+        return True
+
     if event_type == "checkout.session.completed":
         allowed_link = str(app.config.get("STRIPE_PAYMENT_LINK_ID") or "")
         payment_link = str(obj.get("payment_link") or "")
         mode = str(obj.get("mode") or "")
         payment_status = str(obj.get("payment_status") or "")
         if mode != "subscription" or payment_status not in {"paid", "no_payment_required"}:
+            db.commit()
             return jsonify({"received": True, "activated": False})
         if allowed_link and payment_link != allowed_link:
-            return jsonify({"received": True, "activated": False})
-        details = obj.get("customer_details") or {}
-        email = str(details.get("email") or obj.get("customer_email") or "").strip().lower()
-        if email and EMAIL_RE.match(email):
-            subscription_id = obj.get("subscription")
-            customer_id = obj.get("customer")
-            db.execute(
-                """
-                INSERT INTO subscribers(email, status, stripe_customer_id, stripe_subscription_id, min_score)
-                VALUES(?, 'active', ?, ?, ?)
-                ON CONFLICT(email) DO UPDATE SET status='active', stripe_customer_id=excluded.stripe_customer_id,
-                    stripe_subscription_id=excluded.stripe_subscription_id, is_demo=0, updated_at=CURRENT_TIMESTAMP
-                """,
-                (email, customer_id, subscription_id, app.config["DEFAULT_MIN_SCORE"]),
-            )
-            db.execute("UPDATE leads SET status='converted', updated_at=CURRENT_TIMESTAMP WHERE email=?", (email,))
             db.commit()
-            row = db.execute("SELECT id FROM subscribers WHERE email=?", (email,)).fetchone()
-            send_magic_link(email, int(row["id"]))
-    elif event_type in {"customer.subscription.deleted", "customer.subscription.paused"}:
-        subscription_id = obj.get("id")
+            return jsonify({"received": True, "activated": False})
+
+        subscription_id = str(obj.get("subscription") or "").strip()
+        customer_id = str(obj.get("customer") or "").strip()
+        if not subscription_id:
+            db.commit()
+            return jsonify({"received": True, "activated": False})
+        if not apply_subscription_state(subscription_id, customer_id, "active"):
+            db.commit()
+            return jsonify({"received": True, "activated": False, "ignored": "stale_event"})
+
+        details = obj.get("customer_details") or {}
+        if not isinstance(details, dict):
+            details = {}
+        email = str(details.get("email") or obj.get("customer_email") or "").strip().lower()
+        if not email or not EMAIL_RE.match(email):
+            db.commit()
+            return jsonify({"received": True, "activated": False})
+
         db.execute(
-            "UPDATE subscribers SET status='inactive', updated_at=CURRENT_TIMESTAMP WHERE stripe_subscription_id=?",
-            (subscription_id,),
+            """
+            INSERT INTO subscribers(email, status, stripe_customer_id, stripe_subscription_id, min_score)
+            VALUES(?, 'active', ?, ?, ?)
+            ON CONFLICT(email) DO UPDATE SET status='active', stripe_customer_id=excluded.stripe_customer_id,
+                stripe_subscription_id=excluded.stripe_subscription_id, is_demo=0, updated_at=CURRENT_TIMESTAMP
+            """,
+            (email, customer_id, subscription_id, app.config["DEFAULT_MIN_SCORE"]),
         )
+        db.execute("UPDATE leads SET status='converted', updated_at=CURRENT_TIMESTAMP WHERE email=?", (email,))
         db.commit()
-    elif event_type == "customer.subscription.updated":
-        subscription_id = obj.get("id")
-        stripe_status = str(obj.get("status") or "")
-        local_status = "active" if stripe_status in {"active", "trialing"} else "inactive"
-        db.execute(
-            "UPDATE subscribers SET status=?, updated_at=CURRENT_TIMESTAMP WHERE stripe_subscription_id=?",
-            (local_status, subscription_id),
-        )
+        row = db.execute("SELECT id FROM subscribers WHERE email=?", (email,)).fetchone()
+        send_magic_link(email, int(row["id"]))
+        return jsonify({"received": True, "activated": True})
+
+    if event_type in {
+        "customer.subscription.deleted",
+        "customer.subscription.paused",
+        "customer.subscription.updated",
+    }:
+        subscription_id = str(obj.get("id") or "").strip()
+        customer_id = str(obj.get("customer") or "").strip()
+        if not subscription_id:
+            db.commit()
+            return jsonify({"received": True, "updated": False})
+
+        if event_type == "customer.subscription.updated":
+            stripe_status = str(obj.get("status") or "")
+            local_status = "active" if stripe_status in {"active", "trialing"} else "inactive"
+        else:
+            local_status = "inactive"
+
+        applied = apply_subscription_state(subscription_id, customer_id, local_status)
+        if applied:
+            db.execute(
+                "UPDATE subscribers SET status=?, updated_at=CURRENT_TIMESTAMP WHERE stripe_subscription_id=?",
+                (local_status, subscription_id),
+            )
+            if local_status == "inactive":
+                db.execute(
+                    """
+                    UPDATE magic_tokens
+                    SET used_at=CURRENT_TIMESTAMP
+                    WHERE used_at IS NULL
+                      AND subscriber_id IN (
+                          SELECT id FROM subscribers WHERE stripe_subscription_id=?
+                      )
+                    """,
+                    (subscription_id,),
+                )
         db.commit()
+        return jsonify({"received": True, "updated": applied, "status": local_status})
+
+    db.commit()
     return jsonify({"received": True})
 
 
