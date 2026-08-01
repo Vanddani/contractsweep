@@ -41,6 +41,16 @@ services:
         sync: false
       - key: SUPPORT_EMAIL
         sync: false
+      - key: LEGAL_SELLER_NAME
+        sync: false
+      - key: LEGAL_MAILING_ADDRESS
+        sync: false
+      - key: LEGAL_EFFECTIVE_DATE
+        value: "August 1, 2026"
+      - key: LEGAL_GOVERNING_LAW
+        value: "Minnesota"
+      - key: LEGAL_PAGES_APPROVED
+        sync: false
       - key: FOUNDING_PRICE
         value: "79"
       - key: DEFAULT_MIN_SCORE

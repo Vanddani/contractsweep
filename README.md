@@ -267,6 +267,12 @@ The first economic gate is not `$5,000 MRR`; it is evidence that a narrow group 
 - No full terms-of-service/privacy-policy generator is included.
 - No guarantee that the working brand or domain is legally available.
 
+## Legal pages and launch gate
+
+The application includes public pages at `/terms`, `/privacy`, `/cancellation-refunds`, and `/disclosures`. Configure `LEGAL_SELLER_NAME`, `LEGAL_MAILING_ADDRESS`, `LEGAL_EFFECTIVE_DATE`, and `LEGAL_GOVERNING_LAW` in the host environment. Keep `LEGAL_PAGES_APPROVED=false` and `STRIPE_PAYMENT_LINK=#request-access` until the seller identity, policies, cancellation workflow, and checkout disclosures have been reviewed.
+
+The signed-in cancellation form records a request, sends confirmation, and places the request in the admin queue. During the MVP stage, the operator must still cancel the corresponding subscription in Stripe and verify that the webhook deactivates access.
+
 ## Before scaling
 
-Complete a legal and security review, add database backups, monitoring, rate limiting, stronger admin authentication, data-retention rules, a documented incident process, and explicit terms governing public-source data and user-provided information.
+Complete a legal and security review, monitoring, rate limiting, stronger admin authentication, data-retention rules, a documented incident process, and explicit terms governing public-source data and user-provided information.

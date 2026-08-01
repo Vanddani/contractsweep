@@ -80,6 +80,11 @@ app.config.update(
     RESEND_API_KEY=os.getenv("RESEND_API_KEY", ""),
     EMAIL_FROM=os.getenv("EMAIL_FROM", "ContractSweep <alerts@example.com>"),
     SUPPORT_EMAIL=os.getenv("SUPPORT_EMAIL", "support@example.com"),
+    LEGAL_SELLER_NAME=os.getenv("LEGAL_SELLER_NAME", "").strip(),
+    LEGAL_MAILING_ADDRESS=os.getenv("LEGAL_MAILING_ADDRESS", "").strip(),
+    LEGAL_EFFECTIVE_DATE=os.getenv("LEGAL_EFFECTIVE_DATE", "August 1, 2026").strip(),
+    LEGAL_GOVERNING_LAW=os.getenv("LEGAL_GOVERNING_LAW", "Minnesota").strip(),
+    LEGAL_PAGES_APPROVED=truthy(os.getenv("LEGAL_PAGES_APPROVED", "false")),
     FOUNDING_PRICE=int(os.getenv("FOUNDING_PRICE", "79")),
     DEFAULT_MIN_SCORE=int(os.getenv("DEFAULT_MIN_SCORE", "50")),
     DIGEST_MAX_ITEMS=int(os.getenv("DIGEST_MAX_ITEMS", "12")),
@@ -207,6 +212,22 @@ CREATE TABLE IF NOT EXISTS stripe_subscription_states (
     last_event_id TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS cancellation_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subscriber_id INTEGER NOT NULL,
+    email TEXT NOT NULL,
+    stripe_subscription_id TEXT,
+    reason TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TEXT,
+    FOREIGN KEY(subscriber_id) REFERENCES subscribers(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_cancellation_requests_status
+    ON cancellation_requests(status, requested_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cancellation_requests_one_pending
+    ON cancellation_requests(subscriber_id) WHERE status='pending';
 """
 
 
@@ -360,22 +381,52 @@ def apply_security_headers(response: Response) -> Response:
     )
     if app.config["SESSION_COOKIE_SECURE"]:
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
-    if request.path.startswith(("/dashboard", "/opportunity", "/profile", "/admin", "/auth", "/login", "/tasks")):
+    if request.path.startswith(("/dashboard", "/opportunity", "/profile", "/admin", "/auth", "/login", "/tasks", "/cancellation-refunds")):
         response.headers["Cache-Control"] = "private, no-store"
     return response
 
 
 @app.context_processor
 def inject_globals() -> dict[str, Any]:
+    seller_name = str(app.config.get("LEGAL_SELLER_NAME") or "").strip()
+    mailing_address = str(app.config.get("LEGAL_MAILING_ADDRESS") or "").strip()
+    mailing_lines = [
+        part.strip()
+        for part in re.split(r"\s*\|\s*|[\r\n]+", mailing_address)
+        if part.strip()
+    ]
+    support_email = str(app.config.get("SUPPORT_EMAIL") or "").strip()
+    payment_link = str(app.config.get("STRIPE_PAYMENT_LINK") or "").strip()
+    legal_ready = bool(
+        seller_name
+        and mailing_lines
+        and support_email
+        and "example.com" not in support_email.lower()
+        and app.config.get("LEGAL_PAGES_APPROVED")
+    )
+    checkout_ready = bool(
+        legal_ready
+        and payment_link
+        and payment_link != "#request-access"
+        and "replace_me" not in payment_link
+        and payment_link.startswith("https://")
+    )
     return {
         "brand_name": app.config["BRAND_NAME"],
-        "support_email": app.config["SUPPORT_EMAIL"],
+        "support_email": support_email,
         "founding_price": app.config["FOUNDING_PRICE"],
-        "payment_link": app.config["STRIPE_PAYMENT_LINK"],
+        "payment_link": payment_link,
         "enable_public_demo": app.config["ENABLE_PUBLIC_DEMO"],
         "current_subscriber": current_subscriber(),
         "csrf_token": csrf_token,
         "current_year": date.today().year,
+        "legal_seller_name": seller_name,
+        "legal_mailing_lines": mailing_lines,
+        "legal_effective_date": app.config["LEGAL_EFFECTIVE_DATE"],
+        "legal_governing_law": app.config["LEGAL_GOVERNING_LAW"],
+        "legal_pages_approved": bool(app.config.get("LEGAL_PAGES_APPROVED")),
+        "legal_ready": legal_ready,
+        "checkout_ready": checkout_ready,
     }
 
 
@@ -676,6 +727,120 @@ def health() -> Response:
     return jsonify({"status": "ok", "service": app.config["BRAND_NAME"]})
 
 
+@app.route("/terms")
+def terms() -> str:
+    return render_template("terms.html")
+
+
+@app.route("/privacy")
+def privacy() -> str:
+    return render_template("privacy.html")
+
+
+@app.route("/disclosures")
+def disclosures() -> str:
+    return render_template("disclosures.html")
+
+
+@app.route("/cancellation-refunds", methods=["GET", "POST"])
+def cancellation_refunds() -> str | Response:
+    subscriber = current_subscriber()
+    db = get_db()
+
+    if request.method == "POST":
+        if not subscriber:
+            flash("Sign in with the subscribed email before submitting a cancellation request.", "warning")
+            return redirect(url_for("login", next=url_for("cancellation_refunds")))
+        if subscriber["is_demo"]:
+            flash("The public demo has no paid subscription to cancel.", "warning")
+            return redirect(url_for("cancellation_refunds"))
+
+        reason = request.form.get("reason", "").strip()[:2000]
+        acknowledged = request.form.get("acknowledge") == "yes"
+        if not acknowledged:
+            flash("Confirm that you want recurring billing to stop.", "error")
+            return redirect(url_for("cancellation_refunds"))
+
+        existing = db.execute(
+            "SELECT id FROM cancellation_requests WHERE subscriber_id=? AND status='pending'",
+            (subscriber["id"],),
+        ).fetchone()
+        if existing:
+            flash("A cancellation request is already pending for this subscription.", "warning")
+            return redirect(url_for("cancellation_refunds"))
+
+        try:
+            cursor = db.execute(
+                """
+                INSERT INTO cancellation_requests(
+                    subscriber_id, email, stripe_subscription_id, reason, status
+                ) VALUES(?, ?, ?, ?, 'pending')
+                """,
+                (
+                    subscriber["id"],
+                    subscriber["email"],
+                    subscriber["stripe_subscription_id"],
+                    reason,
+                ),
+            )
+            request_id = int(cursor.lastrowid)
+            db.commit()
+        except sqlite3.IntegrityError:
+            db.rollback()
+            flash("A cancellation request is already pending for this subscription.", "warning")
+            return redirect(url_for("cancellation_refunds"))
+
+        confirmation_html = render_template(
+            "email_cancellation_confirmation.html",
+            subscriber=subscriber,
+            request_id=request_id,
+        )
+        operator_html = render_template(
+            "email_cancellation_operator.html",
+            subscriber=subscriber,
+            request_id=request_id,
+            reason=reason,
+        )
+        subscriber_notified = send_email(
+            api_key=app.config["RESEND_API_KEY"],
+            sender=app.config["EMAIL_FROM"],
+            recipients=subscriber["email"],
+            subject=f"{app.config['BRAND_NAME']} cancellation request received",
+            html=confirmation_html,
+        )
+        operator_notified = send_email(
+            api_key=app.config["RESEND_API_KEY"],
+            sender=app.config["EMAIL_FROM"],
+            recipients=app.config["SUPPORT_EMAIL"],
+            subject=f"Cancellation request #{request_id} — {subscriber['email']}",
+            html=operator_html,
+        )
+        if subscriber_notified and operator_notified:
+            flash("Cancellation request recorded. A confirmation email has been sent.", "success")
+        else:
+            flash(
+                "Cancellation request recorded. Email delivery could not be confirmed; keep this page as your receipt and contact support if needed.",
+                "warning",
+            )
+        return redirect(url_for("cancellation_refunds"))
+
+    cancellation_request = None
+    if subscriber and not subscriber["is_demo"]:
+        cancellation_request = db.execute(
+            """
+            SELECT * FROM cancellation_requests
+            WHERE subscriber_id=? AND status='pending'
+            ORDER BY requested_at DESC LIMIT 1
+            """,
+            (subscriber["id"],),
+        ).fetchone()
+    return render_template(
+        "cancellation_refunds.html",
+        subscriber=subscriber,
+        cancellation_request=cancellation_request,
+    )
+
+
 @app.route("/request-access", methods=["POST"])
 def request_access() -> Response:
     email = request.form.get("email", "").strip().lower()[:320]
@@ -971,6 +1136,15 @@ def admin() -> str:
     db = get_db()
     leads = db.execute("SELECT * FROM leads ORDER BY created_at DESC LIMIT 100").fetchall()
     subscribers = db.execute("SELECT * FROM subscribers ORDER BY created_at DESC").fetchall()
+    cancellations = db.execute(
+        """
+        SELECT cr.*, s.company
+        FROM cancellation_requests cr
+        JOIN subscribers s ON s.id = cr.subscriber_id
+        WHERE cr.status='pending'
+        ORDER BY cr.requested_at ASC
+        """
+    ).fetchall()
     counts = {
         "leads": db.execute("SELECT COUNT(*) AS c FROM leads").fetchone()["c"],
         "subscribers": db.execute("SELECT COUNT(*) AS c FROM subscribers WHERE status='active' AND is_demo=0").fetchone()["c"],
@@ -978,8 +1152,15 @@ def admin() -> str:
         "high": db.execute(
             "SELECT COUNT(*) AS c FROM opportunities WHERE source <> 'DEMO' AND relevance_score >= 75"
         ).fetchone()["c"],
+        "cancellations": len(cancellations),
     }
-    return render_template("admin.html", leads=leads, subscribers=subscribers, counts=counts)
+    return render_template(
+        "admin.html",
+        leads=leads,
+        subscribers=subscribers,
+        cancellations=cancellations,
+        counts=counts,
+    )
 
 
 @app.route("/admin/subscribers", methods=["POST"])
@@ -1023,6 +1204,25 @@ def admin_subscriber_status(subscriber_id: int) -> Response:
     )
     get_db().commit()
     flash("Subscriber status updated.", "success")
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/cancellations/<int:request_id>/status", methods=["POST"])
+@admin_required
+def admin_cancellation_status(request_id: int) -> Response:
+    status = request.form.get("status", "resolved")
+    if status not in {"resolved", "dismissed"}:
+        abort(400)
+    get_db().execute(
+        """
+        UPDATE cancellation_requests
+        SET status=?, resolved_at=CURRENT_TIMESTAMP
+        WHERE id=? AND status='pending'
+        """,
+        (status, request_id),
+    )
+    get_db().commit()
+    flash("Cancellation request status updated. Confirm the Stripe subscription was handled separately.", "success")
     return redirect(url_for("admin"))
 
 
@@ -1072,6 +1272,7 @@ def _database_table_counts(db: sqlite3.Connection) -> dict[str, int]:
         "task_locks",
         "stripe_events",
         "stripe_subscription_states",
+        "cancellation_requests",
     )
     counts: dict[str, int] = {}
     for table in tables:
