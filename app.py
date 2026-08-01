@@ -7,7 +7,10 @@ import logging
 import os
 import re
 import secrets
+import shutil
 import sqlite3
+import tempfile
+import zipfile
 from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
@@ -19,6 +22,7 @@ from dotenv import load_dotenv
 from flask import (
     Flask,
     Response,
+    after_this_request,
     abort,
     flash,
     g,
@@ -26,6 +30,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     session,
     url_for,
 )
@@ -1055,6 +1060,101 @@ def task_digests() -> Response:
     except TaskBusyError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 409
     return jsonify({"ok": True, "sent": sent, "skipped": skipped})
+
+
+def _database_table_counts(db: sqlite3.Connection) -> dict[str, int]:
+    tables = (
+        "opportunities",
+        "leads",
+        "subscribers",
+        "pipeline",
+        "magic_tokens",
+        "task_locks",
+        "stripe_events",
+        "stripe_subscription_states",
+    )
+    counts: dict[str, int] = {}
+    for table in tables:
+        row = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+        counts[table] = int(row[0] if row is not None else 0)
+    return counts
+
+
+@app.route("/admin/database-backup")
+@admin_required
+def admin_database_backup() -> Response:
+    """Create, restore-test, and download a consistent SQLite backup bundle."""
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    work_dir = Path(tempfile.mkdtemp(prefix="contractsweep-backup-"))
+    backup_path = work_dir / f"contractsweep-{timestamp}.db"
+    restored_path = work_dir / f"contractsweep-restored-test-{timestamp}.db"
+    report_path = work_dir / f"contractsweep-backup-verification-{timestamp}.json"
+    bundle_path = work_dir / f"contractsweep-backup-{timestamp}.zip"
+
+    try:
+        source_db = get_db()
+        source_db.commit()
+        source_db.execute("PRAGMA wal_checkpoint(PASSIVE)")
+
+        with sqlite3.connect(backup_path, timeout=30) as backup_db:
+            source_db.backup(backup_db)
+
+        with sqlite3.connect(backup_path, timeout=30) as backup_db:
+            backup_integrity = str(backup_db.execute("PRAGMA integrity_check").fetchone()[0])
+            backup_counts = _database_table_counts(backup_db)
+            with sqlite3.connect(restored_path, timeout=30) as restored_db:
+                backup_db.backup(restored_db)
+
+        with sqlite3.connect(restored_path, timeout=30) as restored_db:
+            restored_integrity = str(restored_db.execute("PRAGMA integrity_check").fetchone()[0])
+            restored_counts = _database_table_counts(restored_db)
+
+        verified = (
+            backup_integrity.lower() == "ok"
+            and restored_integrity.lower() == "ok"
+            and backup_counts == restored_counts
+        )
+        report = {
+            "service": app.config["BRAND_NAME"],
+            "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            "database_path": str(app.config["DATABASE_PATH"]),
+            "backup_integrity": backup_integrity,
+            "restored_copy_integrity": restored_integrity,
+            "backup_counts": backup_counts,
+            "restored_copy_counts": restored_counts,
+            "restore_test_passed": verified,
+        }
+        report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+
+        if not verified:
+            raise RuntimeError("SQLite backup restore verification failed")
+
+        with zipfile.ZipFile(bundle_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.write(backup_path, arcname=backup_path.name)
+            archive.write(report_path, arcname=report_path.name)
+
+        @after_this_request
+        def cleanup_backup_files(response: Response) -> Response:
+            try:
+                shutil.rmtree(work_dir)
+            except OSError:
+                LOGGER.warning("Could not remove temporary backup directory %s", work_dir)
+            return response
+
+        response = send_file(
+            bundle_path,
+            as_attachment=True,
+            download_name=bundle_path.name,
+            mimetype="application/zip",
+            max_age=0,
+        )
+        response.headers["X-ContractSweep-Backup-Verified"] = "true"
+        response.headers["Cache-Control"] = "no-store, private"
+        return response
+    except Exception:
+        shutil.rmtree(work_dir, ignore_errors=True)
+        LOGGER.exception("Database backup or restore verification failed")
+        abort(500, description="Database backup verification failed")
 
 
 @app.route("/admin/leads.csv")
