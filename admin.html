@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Admin — {{ brand_name }}{% endblock %}
+{% block content %}
+<section class="section admin-section">
+  <div class="container">
+    <div class="dashboard-header">
+      <div><p class="eyebrow">Operator console</p><h1>Paid-validation admin</h1></div>
+      <div class="toolbar">
+        <a class="button button-secondary button-small" href="{{ url_for('export_leads') }}">Export leads</a>
+        <a class="button button-secondary button-small" href="{{ url_for('admin_database_backup') }}">Verified database backup</a>
+        <form method="post" action="{{ url_for('admin_sync') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button button-dark button-small" type="submit">Sync SAM.gov now</button></form>
+      </div>
+    </div>
+
+    {% if not legal_ready %}
+    <div class="notice-banner"><strong>Launch gate:</strong> paid checkout remains disabled until LEGAL_SELLER_NAME, LEGAL_MAILING_ADDRESS, a real support email, and LEGAL_PAGES_APPROVED=true are configured.</div>
+    {% endif %}
+
+    <div class="stats-grid admin-stats">
+      <div><strong>{{ counts['leads'] }}</strong><span>leads</span></div>
+      <div><strong>{{ counts['subscribers'] }}</strong><span>active paid/non-demo</span></div>
+      <div><strong>{{ counts['opportunities'] }}</strong><span>opportunities</span></div>
+      <div><strong>{{ counts['high'] }}</strong><span>high-relevance</span></div>
+      <div><strong>{{ counts['cancellations'] }}</strong><span>pending cancellations</span></div>
+    </div>
+
+    <div class="admin-grid">
+      <section class="card admin-card">
+        <h2>Activate subscriber</h2>
+        <form class="stacked-form" method="post" action="{{ url_for('admin_create_subscriber') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label>Email<input type="email" name="email" required></label>
+          <label>Company<input type="text" name="company"></label>
+          <label>States<input type="text" name="states" placeholder="IL, WI, IN"></label>
+          <button class="button button-primary" type="submit">Activate and send login</button>
+        </form>
+      </section>
+      <section class="card admin-card">
+        <h2>Launch gate</h2>
+        <ol class="operator-list">
+          <li>Keep checkout disabled until seller details and policy pages are approved.</li>
+          <li>Require five unrelated paid customers before feature expansion.</li>
+          <li>Interview every founding customer.</li>
+          <li>Track activation, digest opens, dashboard use, and cancellation reasons.</li>
+          <li>Reconcile Stripe subscriptions against app access every week.</li>
+        </ol>
+      </section>
+    </div>
+
+    <section class="table-card card">
+      <div class="table-head"><h2>Pending cancellation requests</h2><span>{{ cancellations|length }} pending</span></div>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Requested</th><th>Email</th><th>Company</th><th>Stripe subscription</th><th>Reason</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for item in cancellations %}
+          <tr>
+            <td>{{ item['requested_at'] }}</td><td>{{ item['email'] }}</td><td>{{ item['company'] or '—' }}</td><td>{{ item['stripe_subscription_id'] or '—' }}</td><td class="wrap-cell">{{ item['reason'] or '—' }}</td>
+            <td>
+              <form method="post" action="{{ url_for('admin_cancellation_status', request_id=item['id']) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="resolved">
+                <button class="text-button" type="submit">Mark resolved</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}<tr><td colspan="6">No pending cancellation requests.</td></tr>{% endfor %}
+        </tbody>
+      </table></div>
+      <p class="table-note">Cancel the matching subscription in the live Stripe account before marking a request resolved. The Stripe webhook should deactivate application access.</p>
+    </section>
+
+    <section class="table-card card"><div class="table-head"><h2>Leads</h2><span>{{ leads|length }} shown</span></div><div class="table-scroll"><table><thead><tr><th>Email</th><th>Company</th><th>States</th><th>Status</th><th>Created</th></tr></thead><tbody>{% for lead in leads %}<tr><td>{{ lead['email'] }}</td><td>{{ lead['company'] or '—' }}</td><td>{{ lead['states'] or '—' }}</td><td>{{ lead['status'] }}</td><td>{{ lead['created_at'] }}</td></tr>{% else %}<tr><td colspan="5">No leads yet.</td></tr>{% endfor %}</tbody></table></div></section>
+
+    <section class="table-card card"><div class="table-head"><h2>Subscribers</h2><span>{{ subscribers|length }} total including demo</span></div><div class="table-scroll"><table><thead><tr><th>Email</th><th>Company</th><th>States</th><th>Status</th><th>Demo</th><th>Action</th></tr></thead><tbody>{% for subscriber in subscribers %}<tr><td>{{ subscriber['email'] }}</td><td>{{ subscriber['company'] or '—' }}</td><td>{{ subscriber['states'] or '—' }}</td><td>{{ subscriber['status'] }}</td><td>{{ 'Yes' if subscriber['is_demo'] else 'No' }}</td><td>{% if not subscriber['is_demo'] %}<form method="post" action="{{ url_for('admin_subscriber_status', subscriber_id=subscriber['id']) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="{{ 'inactive' if subscriber['status'] == 'active' else 'active' }}"><button class="text-button" type="submit">{{ 'Deactivate' if subscriber['status'] == 'active' else 'Activate' }}</button></form>{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table></div></section>
+  </div>
+</section>
+{% endblock %}

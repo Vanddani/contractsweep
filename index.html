@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}{{ brand_name }} — Cleaning contract intelligence{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="container hero-grid">
+    <div>
+      <p class="eyebrow">Government bids, narrowed for commercial cleaning</p>
+      <h1>Spend less time searching. Review the cleaning contracts that fit.</h1>
+      <p class="hero-copy">{{ brand_name }} collects federal janitorial and building-service opportunities, ranks category relevance with visible rules, and turns the strongest matches into a practical bid queue.</p>
+      <div class="hero-actions">
+        {% if enable_public_demo %}<a class="button button-primary" href="{{ url_for('demo') }}">Open the working demo</a>{% endif %}
+        <a class="button button-secondary" href="#request-access">Request founding access</a>
+      </div>
+      <p class="fine-print">No black-box “win probability.” No promise of contract awards. The score is a review-priority signal.</p>
+    </div>
+    <div class="product-preview card">
+      <div class="preview-head">
+        <span>Opportunity queue</span><span class="live-dot">Daily sync schedule</span>
+      </div>
+      <article class="mini-opportunity">
+        <div class="score score-high">91</div>
+        <div><strong>Medical center janitorial services</strong><small>VA · Illinois · 28 days left</small></div>
+      </article>
+      <article class="mini-opportunity">
+        <div class="score score-high">84</div>
+        <div><strong>Federal office custodial services</strong><small>GSA · Wisconsin · Small-business set-aside</small></div>
+      </article>
+      <article class="mini-opportunity">
+        <div class="score score-mid">63</div>
+        <div><strong>Facilities support for research campus</strong><small>DOE · New Mexico · Sources sought</small></div>
+      </article>
+      <div class="preview-note">Filter by service area, deadline, set-aside, score, and pipeline stage.</div>
+    </div>
+  </div>
+</section>
+
+<section class="stats-band">
+  <div class="container stats-grid">
+    <div><strong>{{ stats['total'] or 0 }}</strong><span>records in this build</span></div>
+    <div><strong>{{ stats['high_count'] or 0 }}</strong><span>high-relevance matches</span></div>
+    <div><strong>{{ stats['states'] or 0 }}</strong><span>states represented</span></div>
+    <div><strong>4</strong><span>focused NAICS categories</span></div>
+  </div>
+  <p class="container fine-print center">Counts may include clearly labeled synthetic demo records until a SAM.gov API key is connected.</p>
+</section>
+
+<section class="section">
+  <div class="container narrow center">
+    <p class="eyebrow">The product</p>
+    <h2>A bid-discovery workflow, not another giant procurement database.</h2>
+    <p class="section-lead">The first version does one job: convert public federal opportunity data into a short, usable queue for cleaning contractors.</p>
+  </div>
+  <div class="container feature-grid">
+    <article class="feature card"><span class="feature-number">01</span><h3>Collect</h3><p>Pull recent opportunities from the official SAM.gov v2 API across janitorial and related building-service NAICS codes.</p></article>
+    <article class="feature card"><span class="feature-number">02</span><h3>Rank</h3><p>Apply deterministic scoring based on NAICS, service language, notice stage, set-aside, and response time.</p></article>
+    <article class="feature card"><span class="feature-number">03</span><h3>Work</h3><p>Filter, export, track Watch–Qualify–Bid stages, keep notes, and open the official notice from one screen.</p></article>
+    <article class="feature card"><span class="feature-number">04</span><h3>Alert</h3><p>Send a weekday digest matched to the subscriber’s states, minimum score, and certifications.</p></article>
+  </div>
+</section>
+
+<section class="section section-contrast">
+  <div class="container split-grid">
+    <div>
+      <p class="eyebrow">Founding offer</p>
+      <h2>Validate demand before adding expensive features.</h2>
+      <p>The commercial offer is intentionally simple: filtered opportunity access, email digests, CSV exports, pipeline tracking, and the bid calculator.</p>
+      <ul class="check-list">
+        <li>Month-to-month founding access</li>
+        <li>Month-to-month access at the price shown at checkout</li>
+        <li>Direct feedback channel shapes the next release</li>
+      </ul>
+    </div>
+    <div class="pricing-card card">
+      <span class="pill">Founding customer</span>
+      <div class="price"><strong>${{ founding_price }}</strong><span>/month</span></div>
+      <p>Target: the first five unrelated paying companies, then three months of retention evidence.</p>
+      {% if checkout_ready %}
+        <a class="button button-primary button-block" href="{{ payment_link }}">Start paid access</a>
+        <p class="renewal-disclosure"><strong>${{ founding_price }} USD charged monthly until canceled.</strong> No minimum term or cancellation fee. Cancel from the signed-in cancellation page or by emailing support before the next renewal.</p>
+        <small>By subscribing, you agree to the <a href="{{ url_for('terms') }}">Terms</a>, <a href="{{ url_for('privacy') }}">Privacy Notice</a>, and <a href="{{ url_for('cancellation_refunds') }}">Cancellation & Refund Policy</a>.</small>
+      {% else %}
+        <a class="button button-primary button-block" href="#request-access">Request an invite</a>
+        <small>Paid checkout remains invitation-only while final seller details and policies are reviewed. Taxes may apply. No award or income guarantee.</small>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section" id="request-access">
+  <div class="container form-section card">
+    <div>
+      <p class="eyebrow">Paid validation queue</p>
+      <h2>Request founding access.</h2>
+      <p>Use a business email. The qualification check is based on service area, recurring bid volume, and whether the federal feed is useful enough to justify a paid subscription.</p>
+    </div>
+    <form class="stacked-form" method="post" action="{{ url_for('request_access') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="source" value="landing-page">
+      <label>Business email<input type="email" name="email" required placeholder="owner@cleaningcompany.com"></label>
+      <label>Company<input type="text" name="company" placeholder="Company name"></label>
+      <label>Service states<input type="text" name="states" placeholder="IL, WI, IN"></label>
+      <button class="button button-dark" type="submit">Join the founding queue</button>
+    </form>
+  </div>
+</section>
+
+<section class="section compact-section">
+  <div class="container callout">
+    <div><h3>Free bid-floor calculator</h3><p>Estimate a minimum monthly price from your own production rate, labor burden, supplies, overhead, and target margin.</p></div>
+    <a class="button button-secondary" href="{{ url_for('calculator') }}">Open calculator</a>
+  </div>
+</section>
+{% endblock %}
