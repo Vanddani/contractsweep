@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service and Subscription Terms — {{ brand_name }}{% endblock %}
+{% block content %}
+<section class="section legal-section">
+  <div class="container legal-layout">
+    <aside class="legal-nav card" aria-label="Legal pages">
+      <p class="eyebrow">Legal</p>
+      <a class="active" href="{{ url_for('terms') }}">Terms of Service</a>
+      <a href="{{ url_for('privacy') }}">Privacy Notice</a>
+      <a href="{{ url_for('cancellation_refunds') }}">Cancellation & Refunds</a>
+      <a href="{{ url_for('disclosures') }}">Product Disclosures</a>
+    </aside>
+    <article class="legal-document card">
+      <p class="eyebrow">Effective {{ legal_effective_date }}</p>
+      <h1>Terms of Service and Subscription Terms</h1>
+      {% if not legal_ready %}
+      <div class="notice-banner"><strong>Operator notice:</strong> the legal seller identity, mailing address, or approval flag is not configured. Paid checkout remains disabled until these items are completed.</div>
+      {% endif %}
+
+      <div class="legal-summary">
+        <div><span>Price</span><strong>${{ founding_price }} USD per month</strong></div>
+        <div><span>Renewal</span><strong>Automatic monthly renewal until canceled</strong></div>
+        <div><span>Minimum term</span><strong>None</strong></div>
+        <div><span>Cancellation fee</span><strong>None</strong></div>
+      </div>
+
+      <h2>1. Agreement and seller</h2>
+      <p>These Terms govern access to and use of {{ brand_name }}, including its website, opportunity dashboard, email digests, scoring tools, pipeline features, exports, and related services (the “Service”). The seller is <strong>{{ legal_seller_name or 'not yet configured' }}</strong>, operating the {{ brand_name }} service.</p>
+      {% if legal_mailing_lines %}<address>{% for line in legal_mailing_lines %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</address>{% endif %}
+      <p>Support: <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+      <p>By creating or using an account, requesting paid access, or completing checkout, you agree to these Terms on behalf of yourself and the business identified at checkout. You represent that you are at least 18 years old and have authority to bind that business.</p>
+
+      <h2>2. Business-use service</h2>
+      <p>The Service is intended for commercial and professional use by cleaning contractors and related businesses. It is not designed for personal, family, or household use. You are responsible for deciding whether the Service is appropriate for your company, territory, certifications, staffing, insurance, and bid strategy.</p>
+
+      <h2>3. What the Service provides</h2>
+      <p>{{ brand_name }} collects selected public procurement records, currently focused on federal SAM.gov notices in janitorial and related building-service categories. It may filter, normalize, rank, summarize, and deliver those records through a dashboard and email digest. Features, sources, coverage, and update frequency may change during paid validation.</p>
+      <p>The Service does not write proposals, verify certifications, inspect every attachment, provide legal or procurement advice, or guarantee that any opportunity is complete, current, eligible, profitable, or winnable.</p>
+
+      <h2>4. Subscription, billing, and automatic renewal</h2>
+      <p>The founding subscription is <strong>${{ founding_price }} USD per month</strong>, plus any applicable taxes disclosed at checkout. The subscription begins when Stripe confirms payment and automatically renews every month until canceled. Stripe charges the payment method provided at checkout at the beginning of each billing period.</p>
+      <p>There is no minimum commitment and no free trial unless a separate written offer expressly states otherwise. Before completing checkout, review the price, monthly renewal, cancellation method, and refund policy. If checkout displays terms that differ from this page, do not complete the transaction; contact support.</p>
+      <p>We may change prices or material subscription terms prospectively. We will provide advance notice before a material change takes effect for an existing subscriber. A change does not apply retroactively to a completed billing period.</p>
+
+      <h2>5. Cancellation</h2>
+      <p>You may cancel at any time without a cancellation fee. The simplest method is the <a href="{{ url_for('cancellation_refunds') }}">Cancellation & Refunds page</a> while signed in. You may also email <a href="mailto:{{ support_email }}?subject=Cancel%20ContractSweep">{{ support_email }}</a> from the subscribed email address with the subject “Cancel ContractSweep.”</p>
+      <p>A cancellation request is effective for stopping future renewals when it is submitted through the signed-in cancellation form or received at the support address. We process requests promptly and ordinarily within one business day. Access normally continues through the paid billing period unless you request immediate deactivation or Stripe terminates access sooner. If a recurring charge is processed after a timely cancellation request because of an operator delay, contact support for correction.</p>
+
+      <h2>6. Refunds and billing errors</h2>
+      <p>Except for duplicate charges, unauthorized charges, charges processed after a timely cancellation request, material service failure, or where required by law, fees already paid for a billing period are non-refundable. Approved refunds are returned to the original payment method. See the <a href="{{ url_for('cancellation_refunds') }}">Cancellation & Refund Policy</a> for the operational process.</p>
+
+      <h2>7. Accounts and access security</h2>
+      <p>Access is tied to the subscribed email address and uses time-limited, single-use sign-in links. Keep your email account secure and do not share sign-in links or account access outside your company. Notify support promptly of suspected unauthorized access. We may suspend access to protect the Service, investigate misuse, or address unpaid or reversed charges.</p>
+
+      <h2>8. Acceptable use</h2>
+      <p>You may use the Service only for lawful internal business purposes. You may not:</p>
+      <ul>
+        <li>resell, republish, scrape, bulk-download, or build a competing database from the Service;</li>
+        <li>circumvent access controls, probe vulnerabilities, disrupt the Service, or use automated requests not expressly authorized;</li>
+        <li>misrepresent affiliation with a government agency, {{ brand_name }}, or another business;</li>
+        <li>use contact details from public notices for spam, harassment, or unlawful marketing;</li>
+        <li>upload or enter unlawful, infringing, malicious, or highly sensitive information into notes or forms.</li>
+      </ul>
+
+      <h2>9. Public-source data and third-party services</h2>
+      <p>Official procurement sources and third-party providers remain independent from {{ brand_name }}. SAM.gov, government agencies, Stripe, Resend, Render, and linked websites have their own terms, availability, and privacy practices. The official notice, amendments, attachments, and agency instructions control if they conflict with the Service.</p>
+
+      <h2>10. Ownership and license</h2>
+      <p>We retain rights in the Service, software, interface, selection and arrangement of content, scoring logic, and branding. Subject to these Terms and payment, you receive a limited, revocable, non-transferable right to use the Service internally. You retain ownership of notes and company information you submit, and grant us the limited rights necessary to host, process, secure, back up, and display that information to you.</p>
+
+      <h2>11. Availability and changes</h2>
+      <p>The Service is a validation-stage product. We may add, remove, or modify features and data sources, perform maintenance, or correct errors. We will not intentionally remove a core paid feature during a billing period without a reasonable substitute, notice, or appropriate account adjustment.</p>
+
+      <h2>12. Disclaimers</h2>
+      <p>To the maximum extent permitted by law, the Service is provided “as is” and “as available.” We do not warrant uninterrupted operation, complete coverage, perfect classification, or any procurement outcome. Scores are review-priority signals, not award probabilities, eligibility determinations, bid recommendations, legal opinions, tax advice, accounting advice, or professional procurement advice.</p>
+
+      <h2>13. Limitation of liability</h2>
+      <p>To the maximum extent permitted by law, neither party is liable for indirect, incidental, special, consequential, exemplary, or punitive damages, or for lost profits, lost bids, lost contracts, lost data, or business interruption arising from the Service. Our aggregate liability arising from the Service will not exceed the fees you paid for the Service during the three months before the event giving rise to the claim. This limitation does not exclude liability that cannot legally be limited.</p>
+
+      <h2>14. Termination</h2>
+      <p>You may stop using the Service and cancel as described above. We may terminate or suspend access for material breach, unlawful use, security risk, nonpayment, charge reversal, or conduct that threatens the Service or other users. If we terminate a paid account without cause before the end of a billing period, we will provide a prorated refund for the unused period.</p>
+
+      <h2>15. Governing law</h2>
+      <p>These Terms are governed by the laws of {{ legal_governing_law }}, without regard to conflict-of-law rules, except where another law must apply. The parties consent to courts with jurisdiction in Minnesota for disputes that cannot be resolved informally.</p>
+
+      <h2>16. Changes to these Terms</h2>
+      <p>We may update these Terms. The “Effective” date identifies the current version. Material changes affecting an active subscription will be provided in a retainable notice before they take effect. Continued use after the effective date of a non-material update constitutes acceptance.</p>
+
+      <h2>17. Contact</h2>
+      <p>Questions about these Terms may be sent to <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+    </article>
+  </div>
+</section>
+{% endblock %}

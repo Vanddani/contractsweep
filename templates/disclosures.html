@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Product and Government-Affiliation Disclosures — {{ brand_name }}{% endblock %}
+{% block content %}
+<section class="section legal-section">
+  <div class="container legal-layout">
+    <aside class="legal-nav card" aria-label="Legal pages">
+      <p class="eyebrow">Legal</p>
+      <a href="{{ url_for('terms') }}">Terms of Service</a>
+      <a href="{{ url_for('privacy') }}">Privacy Notice</a>
+      <a href="{{ url_for('cancellation_refunds') }}">Cancellation & Refunds</a>
+      <a class="active" href="{{ url_for('disclosures') }}">Product Disclosures</a>
+    </aside>
+    <article class="legal-document card">
+      <p class="eyebrow">Effective {{ legal_effective_date }}</p>
+      <h1>Product and Government-Affiliation Disclosures</h1>
+
+      <h2>Seller identity</h2>
+      <p>{{ brand_name }} is operated by <strong>{{ legal_seller_name or 'a seller identity that has not yet been configured' }}</strong>.</p>
+      {% if legal_mailing_lines %}<address>{% for line in legal_mailing_lines %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</address>{% endif %}
+      <p>Support: <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+
+      <h2>No government affiliation or endorsement</h2>
+      <p>{{ brand_name }} is an independent commercial service. It is not affiliated with, endorsed by, sponsored by, or acting on behalf of SAM.gov, the U.S. General Services Administration, the U.S. government, or any federal, state, local, tribal, foreign, or other public agency. Agency names, program names, and marks are used only to identify public-source records and their issuers.</p>
+
+      <h2>Public-source data</h2>
+      <p>The Service currently uses selected records from the official SAM.gov Contract Opportunities API and may link to other public sources. Data may be delayed, incomplete, amended, archived, duplicated, misclassified, or unavailable. {{ brand_name }} does not control the official source and does not promise complete coverage.</p>
+      <p>The official notice, amendments, attachments, performance work statement, wage determinations, site-visit instructions, and agency communications always control. Verify every material fact at the official source before acting.</p>
+
+      <h2>Meaning of the relevance score</h2>
+      <p>The 0–100 score is a deterministic review-priority signal based on factors such as NAICS category, service language, notice stage, set-aside information, active status, and time remaining. It is not:</p>
+      <ul>
+        <li>a probability of winning;</li>
+        <li>a statement of eligibility or certification;</li>
+        <li>a recommendation to bid or not bid;</li>
+        <li>a legal, procurement, accounting, tax, insurance, bonding, wage, or compliance opinion;</li>
+        <li>a substitute for reading the complete solicitation and attachments.</li>
+      </ul>
+
+      <h2>No award or income guarantee</h2>
+      <p>{{ brand_name }} does not guarantee that you will find a suitable opportunity, submit a compliant bid, receive an award, earn revenue, save a particular amount of time, or achieve any return on investment. Results depend on market conditions, eligibility, pricing, operational capacity, proposal quality, competition, agency decisions, and other factors outside our control.</p>
+
+      <h2>Customer responsibility</h2>
+      <p>You are responsible for verifying service area, registration status, set-aside eligibility, licensing, insurance, bonding, labor and wage requirements, taxes, past performance, staffing, equipment, site visits, deadlines, submission instructions, and all other bid requirements. Contact qualified professional advisers when appropriate.</p>
+
+      <h2>Synthetic demonstration records</h2>
+      <p>The public demo may contain records visibly labeled “DEMO” or “Synthetic demo record.” Those records are fictional interface examples and are not solicitations. Paid subscriber accounts are designed to exclude synthetic demo records.</p>
+
+      <h2>Corrections</h2>
+      <p>Report a suspected data error, misleading classification, or broken source link to <a href="mailto:{{ support_email }}?subject=ContractSweep%20data%20correction">{{ support_email }}</a>. Include the opportunity title and official notice link.</p>
+    </article>
+  </div>
+</section>
+{% endblock %}

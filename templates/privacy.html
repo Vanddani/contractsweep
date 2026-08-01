@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Privacy Notice — {{ brand_name }}{% endblock %}
+{% block content %}
+<section class="section legal-section">
+  <div class="container legal-layout">
+    <aside class="legal-nav card" aria-label="Legal pages">
+      <p class="eyebrow">Legal</p>
+      <a href="{{ url_for('terms') }}">Terms of Service</a>
+      <a class="active" href="{{ url_for('privacy') }}">Privacy Notice</a>
+      <a href="{{ url_for('cancellation_refunds') }}">Cancellation & Refunds</a>
+      <a href="{{ url_for('disclosures') }}">Product Disclosures</a>
+    </aside>
+    <article class="legal-document card">
+      <p class="eyebrow">Last updated {{ legal_effective_date }}</p>
+      <h1>Privacy Notice</h1>
+      {% if not legal_ready %}<div class="notice-banner"><strong>Operator notice:</strong> seller contact details are not fully configured. Paid checkout remains disabled.</div>{% endif %}
+      <p>This Privacy Notice explains how <strong>{{ legal_seller_name or brand_name }}</strong> (“{{ brand_name }},” “we,” “us,” or “our”) collects, uses, discloses, and retains personal data in connection with the Service.</p>
+
+      <h2>1. Scope</h2>
+      <p>This notice applies to visitors, leads, subscribers, and business representatives who use {{ brand_name }}. The Service is intended for business use and is not directed to children.</p>
+
+      <h2>2. Personal data we process</h2>
+      <ul>
+        <li><strong>Contact and business data:</strong> name, business email, company, service states, certifications or set-aside preferences, and support communications.</li>
+        <li><strong>Account and authentication data:</strong> subscriber status, single-use sign-in token records, session information, and security events.</li>
+        <li><strong>Product-use data:</strong> opportunity filters, alert settings, pipeline stages, notes, exports, cancellation requests, and feature interactions.</li>
+        <li><strong>Billing metadata:</strong> Stripe customer and subscription identifiers, checkout email, payment status, plan, and event status. We do not receive or store full payment-card numbers.</li>
+        <li><strong>Email-delivery data:</strong> delivery, bounce, suppression, and related transactional-email metadata from Resend.</li>
+        <li><strong>Technical data:</strong> IP address, device and browser information, timestamps, request paths, server logs, and essential session-cookie data.</li>
+        <li><strong>Public procurement data:</strong> public notice records and agency contact details obtained from official sources. These records are not collected from subscriber accounts.</li>
+      </ul>
+
+      <h2>3. Why we use personal data</h2>
+      <p>We use personal data to:</p>
+      <ul>
+        <li>provide, personalize, secure, and maintain the Service;</li>
+        <li>authenticate users and send sign-in links and opportunity digests;</li>
+        <li>process subscriptions, reconcile billing, respond to cancellations, and prevent fraud;</li>
+        <li>save alert settings, pipeline decisions, notes, and exports;</li>
+        <li>respond to support, privacy, and legal requests;</li>
+        <li>monitor reliability, investigate incidents, and improve data quality;</li>
+        <li>comply with accounting, tax, contractual, and legal obligations.</li>
+      </ul>
+
+      <h2>4. Cookies and similar technology</h2>
+      <p>{{ brand_name }} uses an essential session cookie to maintain signed-in access and protect forms. We do not currently use third-party advertising cookies or cross-site behavioral advertising trackers.</p>
+
+      <h2>5. When we disclose personal data</h2>
+      <p>We disclose personal data only as reasonably necessary to operate the Service, including to:</p>
+      <ul>
+        <li><strong>Stripe</strong> for checkout, subscription billing, payment status, and fraud prevention;</li>
+        <li><strong>Resend</strong> for transactional email delivery;</li>
+        <li><strong>Render</strong> for application hosting, storage, logging, and network delivery;</li>
+        <li>professional advisers, authorities, or counterparties when reasonably necessary for legal compliance, security, tax, accounting, or a business transfer.</li>
+      </ul>
+      <p>We do not sell personal data, share it for cross-context behavioral advertising, or use personal data for profiling that produces legal or similarly significant effects. Opportunity relevance scores evaluate public contract records, not people.</p>
+
+      <h2>6. Retention</h2>
+      <p>We retain account and product-use data while an account is active and for a reasonable period afterward to provide support, maintain security, resolve disputes, and meet legal, tax, accounting, and backup obligations. Billing and cancellation records may be retained longer where reasonably required. Backups are rotated and may retain deleted data for a limited period before expiration.</p>
+
+      <h2>7. Your choices and privacy requests</h2>
+      <p>Depending on applicable law, you may request access, correction, deletion, portability, or information about disclosures of personal data. You may also object to or restrict certain processing where the law provides that right. Submit a request from the email associated with your account to <a href="mailto:{{ support_email }}?subject=Privacy%20request">{{ support_email }}</a> with the subject “Privacy request.”</p>
+      <p>We may verify your identity and authority before acting. We will respond within the time required by applicable law. If we deny a request, you may appeal by replying with the subject “Privacy appeal” and explaining why you believe the decision should be reconsidered.</p>
+      <p>You may update alert-profile information in the Service. You may stop opportunity emails by canceling the subscription or asking support to deactivate the account. Transactional messages necessary for security, billing, or a pending request may still be sent.</p>
+
+      <h2>8. Security</h2>
+      <p>We use measures intended to protect personal data, including HTTPS, secure cookies, single-use sign-in links, access controls, signed webhooks, separate secrets, database backups, and limited administrative access. No system can guarantee absolute security. Notify <a href="mailto:{{ support_email }}">{{ support_email }}</a> promptly if you suspect unauthorized access.</p>
+
+      <h2>9. International processing</h2>
+      <p>The Service is operated from the United States. Service providers may process data in the United States or other locations where they operate, subject to their contractual and legal safeguards.</p>
+
+      <h2>10. Children</h2>
+      <p>The Service is for business users who are at least 18 years old. We do not knowingly collect personal data from children.</p>
+
+      <h2>11. Changes to this notice</h2>
+      <p>We may update this notice as the Service or legal requirements change. The date at the top identifies the current version. Material changes will be communicated through the Service or email when appropriate.</p>
+
+      <h2>12. Contact</h2>
+      <p><strong>{{ legal_seller_name or brand_name }}</strong><br>
+      {% for line in legal_mailing_lines %}{{ line }}<br>{% endfor %}
+      <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+    </article>
+  </div>
+</section>
+{% endblock %}

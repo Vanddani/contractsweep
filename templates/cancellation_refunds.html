@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Cancellation and Refund Policy — {{ brand_name }}{% endblock %}
+{% block content %}
+<section class="section legal-section">
+  <div class="container legal-layout">
+    <aside class="legal-nav card" aria-label="Legal pages">
+      <p class="eyebrow">Legal</p>
+      <a href="{{ url_for('terms') }}">Terms of Service</a>
+      <a href="{{ url_for('privacy') }}">Privacy Notice</a>
+      <a class="active" href="{{ url_for('cancellation_refunds') }}">Cancellation & Refunds</a>
+      <a href="{{ url_for('disclosures') }}">Product Disclosures</a>
+    </aside>
+    <article class="legal-document card">
+      <p class="eyebrow">Effective {{ legal_effective_date }}</p>
+      <h1>Cancellation and Refund Policy</h1>
+      {% if not legal_ready %}<div class="notice-banner"><strong>Operator notice:</strong> seller details or policy approval are incomplete. Paid checkout remains disabled.</div>{% endif %}
+
+      <div class="legal-summary">
+        <div><span>Billing</span><strong>${{ founding_price }} monthly</strong></div>
+        <div><span>Renewal</span><strong>Automatic until canceled</strong></div>
+        <div><span>Cancel</span><strong>Any time</strong></div>
+        <div><span>Fee</span><strong>No cancellation fee</strong></div>
+      </div>
+
+      <h2>How to cancel</h2>
+      <p>You may cancel at any time through the signed-in form below. You may also email <a href="mailto:{{ support_email }}?subject=Cancel%20ContractSweep">{{ support_email }}</a> from the subscribed email address with the subject “Cancel ContractSweep.” Include the company name if it differs from the checkout name.</p>
+      <p>A request is effective for stopping future renewals when submitted through this form or received by the support address. We process requests promptly and ordinarily within one business day. You will receive confirmation when the request is recorded or processed.</p>
+
+      {% if cancellation_request %}
+      <div class="status-card status-pending">
+        <strong>Cancellation request pending</strong>
+        <span>Request #{{ cancellation_request['id'] }} was recorded {{ cancellation_request['requested_at'] }} UTC.</span>
+        <p>No additional form submission is needed. Contact support if you do not receive a final confirmation within one business day.</p>
+      </div>
+      {% elif subscriber and not subscriber['is_demo'] %}
+      <form class="stacked-form cancellation-form" method="post" action="{{ url_for('cancellation_refunds') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Optional reason
+          <textarea name="reason" rows="5" maxlength="2000" placeholder="What made the subscription no longer useful?"></textarea>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" name="acknowledge" value="yes" required>
+          <span>I want recurring billing for {{ subscriber['email'] }} to stop. I understand access normally continues through the current paid period unless I request immediate deactivation.</span>
+        </label>
+        <button class="button button-dark" type="submit">Submit cancellation request</button>
+      </form>
+      {% elif subscriber and subscriber['is_demo'] %}
+      <div class="notice-banner">The public demo does not have a paid subscription to cancel.</div>
+      {% else %}
+      <div class="status-card">
+        <strong>Sign in before canceling</strong>
+        <p>Use the email attached to the active subscription so the request can be matched to the correct Stripe account.</p>
+        <a class="button button-dark" href="{{ url_for('login', next=url_for('cancellation_refunds')) }}">Subscriber sign in</a>
+      </div>
+      {% endif %}
+
+      <h2>When access ends</h2>
+      <p>Unless you request immediate deactivation, access normally remains available through the billing period already paid. Cancellation prevents the next monthly renewal. If Stripe has already started processing a renewal before the request is received, contact support; we will review the timestamp and correct any charge caused by an operator processing delay.</p>
+
+      <h2>Refunds</h2>
+      <p>Monthly fees are generally non-refundable after a billing period begins because access and data delivery are made available immediately. We will review and, where appropriate, refund:</p>
+      <ul>
+        <li>duplicate charges;</li>
+        <li>unauthorized charges reported promptly;</li>
+        <li>charges processed after a timely cancellation request;</li>
+        <li>a material service failure that prevents meaningful use for a substantial portion of the billing period;</li>
+        <li>amounts required to be refunded by applicable law.</li>
+      </ul>
+      <p>Approved refunds are issued to the original payment method. Bank processing time is outside our control.</p>
+
+      <h2>Failed payments and charge disputes</h2>
+      <p>Access may be suspended or deactivated after a failed, reversed, or disputed payment. Contact support before initiating a chargeback so billing errors can be investigated. This does not limit rights that cannot legally be waived.</p>
+
+      <h2>Contact</h2>
+      <p><a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+    </article>
+  </div>
+</section>
+{% endblock %}

@@ -66,7 +66,7 @@
       <p>The commercial offer is intentionally simple: filtered opportunity access, email digests, CSV exports, pipeline tracking, and the bid calculator.</p>
       <ul class="check-list">
         <li>Month-to-month founding access</li>
-        <li>Founding price locked while continuously subscribed</li>
+        <li>Month-to-month access at the price shown at checkout</li>
         <li>Direct feedback channel shapes the next release</li>
       </ul>
     </div>
@@ -74,12 +74,14 @@
       <span class="pill">Founding customer</span>
       <div class="price"><strong>${{ founding_price }}</strong><span>/month</span></div>
       <p>Target: the first five unrelated paying companies, then three months of retention evidence.</p>
-      {% if payment_link and payment_link != '#request-access' and 'replace_me' not in payment_link %}
+      {% if checkout_ready %}
         <a class="button button-primary button-block" href="{{ payment_link }}">Start paid access</a>
+        <p class="renewal-disclosure"><strong>${{ founding_price }} USD charged monthly until canceled.</strong> No minimum term or cancellation fee. Cancel from the signed-in cancellation page or by emailing support before the next renewal.</p>
+        <small>By subscribing, you agree to the <a href="{{ url_for('terms') }}">Terms</a>, <a href="{{ url_for('privacy') }}">Privacy Notice</a>, and <a href="{{ url_for('cancellation_refunds') }}">Cancellation & Refund Policy</a>.</small>
       {% else %}
         <a class="button button-primary button-block" href="#request-access">Request an invite</a>
+        <small>Paid checkout remains invitation-only while final seller details and policies are reviewed. Taxes may apply. No award or income guarantee.</small>
       {% endif %}
-      <small>Taxes may apply. Subscription access does not include proposal writing, legal advice, certification, or an award guarantee.</small>
     </div>
   </div>
 </section>

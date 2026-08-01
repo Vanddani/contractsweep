@@ -20,6 +20,7 @@
         {% if current_subscriber %}
           <a href="{{ url_for('dashboard') }}">Dashboard</a>
           <a href="{{ url_for('profile') }}">Alert profile</a>
+          {% if not current_subscriber['is_demo'] %}<a href="{{ url_for('cancellation_refunds') }}">Cancel subscription</a>{% endif %}
           <a class="button button-small button-ghost" href="{{ url_for('logout') }}">Sign out</a>
         {% else %}
           {% if enable_public_demo %}<a href="{{ url_for('demo') }}">Product demo</a>{% endif %}
@@ -46,14 +47,25 @@
       <div>
         <strong>{{ brand_name }}</strong>
         <p>Focused contract intelligence for commercial cleaning operators.</p>
+        {% if legal_seller_name %}<p class="seller-line">Operated by {{ legal_seller_name }}.</p>{% endif %}
       </div>
       <div>
         <p><a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
-        <p class="muted">Not affiliated with SAM.gov, GSA, or any government agency. Verify every notice and attachment at the official source before acting.</p>
+        <p class="muted">Independent commercial service. Not affiliated with SAM.gov, GSA, or any government agency. Verify every notice and attachment at the official source before acting.</p>
       </div>
     </div>
-    <div class="container footer-bottom">© {{ current_year }} {{ brand_name }}. Working MVP brand; complete domain and trademark clearance before public launch.</div>
+    <nav class="container legal-links" aria-label="Legal and policy links">
+      <a href="{{ url_for('terms') }}">Terms</a>
+      <a href="{{ url_for('privacy') }}">Privacy</a>
+      <a href="{{ url_for('cancellation_refunds') }}">Cancellation & refunds</a>
+      <a href="{{ url_for('disclosures') }}">Product disclosures</a>
+    </nav>
+    <div class="container footer-bottom">
+      © {{ current_year }} {{ brand_name }}.
+      {% if legal_ready %}All rights reserved.{% else %}Paid checkout is disabled pending legal seller configuration and policy approval.{% endif %}
+    </div>
   </footer>
+
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
   {% block scripts %}{% endblock %}
 </body>
