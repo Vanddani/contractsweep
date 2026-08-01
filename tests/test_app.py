@@ -135,3 +135,78 @@ def test_security_headers_are_present(client):
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
     assert "default-src 'self'" in response.headers["Content-Security-Policy"]
+
+
+def test_legal_pages_render(client):
+    for path, marker in [
+        ("/terms", b"Terms of Service and Subscription Terms"),
+        ("/privacy", b"Privacy Notice"),
+        ("/cancellation-refunds", b"Cancellation and Refund Policy"),
+        ("/disclosures", b"Government-Affiliation Disclosures"),
+    ]:
+        response = client.get(path)
+        assert response.status_code == 200
+        assert marker in response.data
+
+
+def test_paid_checkout_requires_approved_legal_configuration(client, monkeypatch):
+    monkeypatch.setitem(app_module.app.config, "STRIPE_PAYMENT_LINK", "https://buy.stripe.com/example")
+    monkeypatch.setitem(app_module.app.config, "LEGAL_SELLER_NAME", "Example Seller, doing business as ContractSweep")
+    monkeypatch.setitem(app_module.app.config, "LEGAL_MAILING_ADDRESS", "100 Main Street | Minneapolis, MN 55401 | United States")
+    monkeypatch.setitem(app_module.app.config, "SUPPORT_EMAIL", "support@contractsweep.example")
+    monkeypatch.setitem(app_module.app.config, "LEGAL_PAGES_APPROVED", False)
+    # The context processor must keep checkout hidden until the explicit approval flag is true.
+    response = client.get("/")
+    assert b"Start paid access" not in response.data
+    assert b"Request an invite" in response.data
+
+    monkeypatch.setitem(app_module.app.config, "LEGAL_PAGES_APPROVED", True)
+    response = client.get("/")
+    assert b"Start paid access" in response.data
+    assert b"charged monthly until canceled" in response.data
+
+
+def test_subscriber_can_record_cancellation_request(client):
+    with app_module.app.app_context():
+        db = app_module.get_db()
+        db.execute(
+            """
+            INSERT INTO subscribers(email, company, status, is_demo, min_score, stripe_subscription_id)
+            VALUES('cancel@example.com', 'Cancel Test', 'active', 0, 0, 'sub_test_123')
+            """
+        )
+        db.commit()
+        subscriber_id = db.execute(
+            "SELECT id FROM subscribers WHERE email='cancel@example.com'"
+        ).fetchone()["id"]
+
+    with client.session_transaction() as sess:
+        sess.clear()
+        sess["subscriber_id"] = subscriber_id
+        sess["_csrf_token"] = "test-csrf"
+
+    response = client.post(
+        "/cancellation-refunds",
+        data={
+            "csrf_token": "test-csrf",
+            "acknowledge": "yes",
+            "reason": "No longer pursuing federal work",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Cancellation request recorded" in response.data
+
+    with app_module.app.app_context():
+        db = app_module.get_db()
+        request_row = db.execute(
+            "SELECT * FROM cancellation_requests WHERE subscriber_id=?",
+            (subscriber_id,),
+        ).fetchone()
+        subscriber = db.execute(
+            "SELECT status FROM subscribers WHERE id=?", (subscriber_id,)
+        ).fetchone()
+        assert request_row is not None
+        assert request_row["status"] == "pending"
+        assert request_row["stripe_subscription_id"] == "sub_test_123"
+        assert subscriber["status"] == "active"
